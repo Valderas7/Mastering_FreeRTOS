@@ -1,0 +1,9 @@
+LaunchTargetManager/org.eclipse.launchbar.core.launchTargetType.local,Local/arch=x86_64
+LaunchTargetManager/org.eclipse.launchbar.core.launchTargetType.local,Local/os=linux
+configDescList=org.eclipse.launchbar.core.descriptorType.default\:STM32_FreeRTOS_Led_and_Button Run,org.eclipse.launchbar.core.descriptorType.default\:STM32_FreeRTOS_Queue_Processing Run,org.eclipse.launchbar.core.descriptorType.default\:STM32_HelloWorld Debug,org.eclipse.launchbar.core.descriptorType.default\:STM32_FreeRTOS_Bin_Sema_Tasks.elf,org.eclipse.launchbar.core.descriptorType.default\:STM32_FreeRTOS_Bin_Sema_Tasks Debug (1),org.eclipse.launchbar.core.descriptorType.default\:STM32_FreeRTOS_Bin_Sema_Tasks Debug
+eclipse.preferences.version=1
+org.eclipse.launchbar.core.descriptorType.default\:STM32_FreeRTOS_Bin_Sema_Tasks\ Debug/activeLaunchMode=run
+org.eclipse.launchbar.core.descriptorType.default\:STM32_FreeRTOS_Led_and_Button\ Run/activeLaunchMode=run
+org.eclipse.launchbar.core.descriptorType.default\:STM32_FreeRTOS_Led_and_Button\ Run/activeLaunchTarget=org.eclipse.launchbar.core.launchTargetType.local\:Local
+org.eclipse.launchbar.core.descriptorType.default\:STM32_HelloWorld\ Debug/activeLaunchMode=run
+org.eclipse.launchbar.core.descriptorType.default\:STM32_HelloWorld\ Debug/activeLaunchTarget=org.eclipse.launchbar.core.launchTargetType.local\:Local

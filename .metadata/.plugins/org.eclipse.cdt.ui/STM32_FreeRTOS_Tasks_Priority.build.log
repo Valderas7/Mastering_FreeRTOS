@@ -1,0 +1,23 @@
+14:55:23 **** Build of configuration Debug for project STM32_FreeRTOS_Tasks_Priority ****
+make -j8 all 
+Building file: ../src/main.c
+Invoking: MCU GCC Compiler
+/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_Tasks_Priority/Debug
+arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -DSTM32 -DSTM32F4 -DSTM32F446RETx -DNUCLEO_F446RE -DDEBUG -DSTM32F446xx -DUSE_STDPERIPH_DRIVER -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_Tasks_Priority/StdPeriph_Driver/inc" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_Tasks_Priority/Third-Party/SEGGER/SEGGER" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_Tasks_Priority/Third-Party/SEGGER/OS" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_Tasks_Priority/Third-Party/SEGGER/Config" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_Tasks_Priority/Third-Party/FreeRTOS/org/Source/include" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_Tasks_Priority/Third-Party/FreeRTOS/org/Source/portable/GCC/ARM_CM4F" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_Tasks_Priority/Config" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_Tasks_Priority/inc" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_Tasks_Priority/CMSIS/device" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_Tasks_Priority/CMSIS/core" -O0 -g3 -Wall -fmessage-length=0 -ffunction-sections -c -MMD -MP -MF"src/main.d" -MT"src/main.o" -o "src/main.o" "../src/main.c"
+Finished building: ../src/main.c
+ 
+Building target: STM32_FreeRTOS_Tasks_Priority.elf
+Invoking: MCU GCC Linker
+arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -T"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_Tasks_Priority/LinkerScript.ld" -Wl,-Map=output.map -Wl,--gc-sections -o "STM32_FreeRTOS_Tasks_Priority.elf" @"objects.list"   -lm
+Finished building target: STM32_FreeRTOS_Tasks_Priority.elf
+ 
+make --no-print-directory post-build
+Generating binary and Printing size information:
+arm-none-eabi-objcopy -O binary "STM32_FreeRTOS_Tasks_Priority.elf" "STM32_FreeRTOS_Tasks_Priority.bin"
+arm-none-eabi-size "STM32_FreeRTOS_Tasks_Priority.elf"
+   text	   data	    bss	    dec	    hex	filename
+  37728	   2532	  96552	 136812	  2166c	STM32_FreeRTOS_Tasks_Priority.elf
+ 
+
+14:55:24 Build Finished (took 775ms)
+

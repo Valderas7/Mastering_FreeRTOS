@@ -1,0 +1,275 @@
+/**
+  ******************************************************************************
+  * @file    main.c
+  * @author  Antonio Valderas
+  * @version V1.0
+  * @date    30-Noviembre-2020
+  * @brief   Default main function.
+  ******************************************************************************
+*/
+
+// Se incluyen librerías generales.
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+// Se incluyen librerías de FreeRTOS.
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
+
+// Se incluye librería específica del microcontrolador.
+#include "stm32f4xx.h"
+
+// Macros
+#define TRUE 1
+#define FALSE 0
+#define NOT_PRESSED FALSE
+#define PRESSED TRUE
+
+//Para usar el mutex no se comenta la macro de debajo.
+#define USE_MUTEX
+
+/* Dimensiones del buffer en el que se colocan los mensajes
+ * destinados a la sálida estándar (stdout/UART). */
+#define mainMAX_MSG_LEN	80
+
+// Variables globales.
+char usr_msg[250] = {0};
+
+// Prototipos de funciones.
+static void prvSetupHardware(void);
+void printmsg(char *msg);
+static void prvSetupUart(void);
+void prvSetupGpio(void);
+
+/* La tarea a ser creada. Se van a crear dos instancias
+ * distintas de esta tarea. */
+static void prvPrintTask(void *pvParameters);
+
+/* La función que usa un mutex para controlar el acceso a
+ * la salida estándar (stdout/UART). */
+static void prvNewPrintString(const portCHAR *pcString);
+
+// Handles de tareas.
+TaskHandle_t xTaskHandle1 = NULL;
+TaskHandle_t xTaskHandle2 = NULL;
+
+#ifdef USE_MUTEX
+/* Handle del mutex. Para referenciar el mutex que se
+ * usa. */
+xSemaphoreHandle xMutex = NULL;
+#endif
+
+int main(void)
+{
+	// Esto es para activar el 'timestamp' en SEGGER.
+	DWT->CTRL |= (1 << 0); /*Activa el contador de ciclos
+	(CYCCNT) en el registro de control (CTRL).*/
+
+	/* 1. Resetea la configuración del reloj del sistema
+	 * al estado de reseteo por defecto:
+	 * HSI ON, PLL OFF, HSE OFF, reloj del sistema = 16MHz,
+	 * reloj de la CPU = 16MHz */
+	RCC_DeInit();
+
+	//2. Actualiza la variable 'SystemCoreClock'.
+	SystemCoreClockUpdate();
+
+	prvSetupHardware();
+
+	// Empieza la grabación con SEGGER
+	SEGGER_SYSVIEW_Conf();
+	SEGGER_SYSVIEW_Start();
+
+	/* Se imprime un mensaje introductorio por el UART de
+	 * la aplicación. */
+	sprintf(usr_msg,"\r\nEsta es la Demo de 'Exclusión mutua usando Mutex'.\r\n");
+	printmsg(usr_msg);
+
+    #ifdef USE_MUTEX
+	/* Se crea un mutex, guardándolo en el 'handle'
+	 * creado anteriormente. */
+	xMutex = xSemaphoreCreateMutex();
+    #endif
+
+	/* Las tareas van a usar un delay pseudoaleatorio, por
+	 * lo que se establece el número inicial (semilla)
+	 * para el generador de números aleatorios usado por
+	 * la función 'rand' que se va a usar posteriormente. */
+	srand(567);
+
+	#ifdef USE_MUTEX
+	/* Sólo si el semáforo 'mutex' ha sido creado con éxito,
+	 * las tareas y el planificador son creados. */
+	if (xMutex != NULL)
+	{
+    #endif
+
+		/* Se crean dos instancias de las tareas que van a
+		 * escribir por el UART (stdout). El string que
+		 * intentan escribir se pasa como parámetro y se
+		 * crean con distintas prioridades para que pueda
+		 * ocurrir un cambio de contexto. */
+		xTaskCreate(prvPrintTask, "Tarea-1", 500, "Tarea 1 ***********************\r\n", 1, &xTaskHandle1);
+		xTaskCreate(prvPrintTask, "Tarea-2", 500, "Tarea 2 -----------------------\r\n", 2, &xTaskHandle2);
+
+		/* Se crea el planificador, por lo que ambas tareas
+		 * se empezarán a ejecutar. */
+		vTaskStartScheduler();
+
+	#ifdef USE_MUTEX
+	}
+    #endif
+
+	/* Si tod*o* va bien nunca llegaremos aquí, ya que el
+	 * planificador estará ejecutando las tareas.
+	 * Si llegamos aquí es probable que no haya suficiente
+	 * memoria dinámica disponible para crear los recursos. */
+	for(;;);
+}
+
+/* La función que usa un mutex para controlar el acceso a
+ * la salida estándar (stdout/UART). */
+static void prvNewPrintString(const portCHAR *pcString)
+{
+	// Buffer para enviar los mensajes.
+	static char cBuffer[mainMAX_MSG_LEN];
+
+	#ifdef USE_MUTEX
+	/* El mutex es creado antes de que el planificador
+	 * empiece, por lo que ya existe una vez las tareas se
+	 * ejecuten.
+	 * Se intenta coger el mutex, bloqueándose
+	 * indefinidamente si el mutex no está disponible. */
+	if (xSemaphoreTake(xMutex,portMAX_DELAY))
+	{
+	#endif
+
+		/* Las siguientes líneas se ejecutarán para
+		 * imprimir sobre el UART2 los distintos mensajes
+		 * de las dos tareas. */
+		sprintf(cBuffer,"%s",pcString);
+		printmsg(cBuffer);
+
+	#ifdef USE_MUTEX
+	}
+	/* Una vez cumplida la función, se devuelve el mutex. */
+	xSemaphoreGive(xMutex);
+	#endif
+}
+
+/* Código de las dos tareas para imprimir mensaje. */
+static void prvPrintTask(void *pvParameters)
+{
+	char *pcStringToPrint;
+
+	/* Dos instancias de esta tarea se crean, así que el
+	 * string que la tarea enviará a 'prvNewPrintString()'
+	 * se pasa en el parámetro de la tarea. Se transmite
+	 * esto al tipo de datos requerido (char). */
+	pcStringToPrint = (char *) pvParameters;
+
+	// Bucle infinito, como en todas las tareas.
+	for( ;; )
+	{
+		/* Se imprime la cadena de caracteres usando la
+		 * nueva función definida. */
+		prvNewPrintString(pcStringToPrint);
+		/* Ahora la tarea se bloquea durante un tiempo
+		 * pseudoaleatorio. */
+		vTaskDelay(rand() & 0xF);
+	}
+}
+
+static void prvSetupHardware(void)
+{
+	// Configuración del botón de usuario y el LED.
+	prvSetupGpio();
+
+	// Configuración del UART2.
+	prvSetupUart();
+}
+
+/* Para imprimir mensajes por el UART sin que se solapen
+ * los caracteres. */
+void printmsg(char *msg)
+{
+	for(uint32_t i = 0; i < strlen(msg); i++)
+	{
+		while (USART_GetFlagStatus(USART2, USART_FLAG_TXE) != SET);
+		USART_SendData(USART2, msg[i]);
+	}
+
+}
+
+static void prvSetupUart(void)
+{
+	// Variables para definir la estructura de GPIO y USART.
+	GPIO_InitTypeDef gpio_uart_pins;
+	USART_InitTypeDef uart2_init;
+
+	/* 1. Se activa el reloj de los periféricos UART2 y
+	 * GPIOA. PA2 es UART2_TX, PA3 es UART2_RX. */
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2,ENABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA,ENABLE);
+
+	/* Inicializar a cero todos y cada uno de los miembros
+	 * de la estructura. */
+	memset(&gpio_uart_pins,0,sizeof(gpio_uart_pins));
+
+	/* 2. Configuración de función alterna de los pins del
+	 * microcontrolador para que se comporten como UART2 TX
+	 * y RX. */
+	gpio_uart_pins.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3;
+	gpio_uart_pins.GPIO_Mode = GPIO_Mode_AF;
+	gpio_uart_pins.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_Init(GPIOA, &gpio_uart_pins);
+
+	/* 3. Ajustes del modo 'función alternativa' para los
+	 * pines. */
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_USART2); //PA2
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource3, GPIO_AF_USART2); //PA3
+
+	/* Inicializar a cero todos y cada uno de los miembros
+	 * de la estructura. */
+	memset(&uart2_init,0,sizeof(uart2_init));
+
+	// 4. Parámetros de inicialización del UART
+	uart2_init.USART_BaudRate = 115200;
+	uart2_init.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	uart2_init.USART_Mode = USART_Mode_Tx | USART_Mode_Rx;
+	uart2_init.USART_Parity = USART_Parity_No;
+	uart2_init.USART_StopBits = USART_StopBits_1;
+	uart2_init.USART_WordLength = USART_WordLength_8b;
+	USART_Init(USART2, &uart2_init);
+
+	// 5. Se activa el periférico UART2.
+	USART_Cmd(USART2, ENABLE);
+}
+
+void prvSetupGpio(void)
+{
+	// Activa las señales de reloj de los periféricos
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+
+	/* Inicializa GPIO A5 (LED) según los parámetros de
+	 * debajo. */
+	GPIO_InitTypeDef led_init, button_init;
+	led_init.GPIO_Mode = GPIO_Mode_OUT;
+	led_init.GPIO_OType = GPIO_OType_PP;
+	led_init.GPIO_Pin = GPIO_Pin_5;
+	led_init.GPIO_Speed = GPIO_Low_Speed;
+	led_init.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOA, &led_init);
+
+	/* Inicializa GPIO C13 (USER BUTTON) según los
+	 * parámetros de debajo. */
+	button_init.GPIO_Mode = GPIO_Mode_IN;
+	button_init.GPIO_OType = GPIO_OType_PP;
+	button_init.GPIO_Pin = GPIO_Pin_13;
+	button_init.GPIO_Speed = GPIO_Low_Speed;
+	button_init.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOC, &button_init);
+}

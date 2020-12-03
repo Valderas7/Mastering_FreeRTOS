@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<section name="EXPORT_DIALOG">
+		<item value="0x20013690" key="Start"/>
+		<item value="0x2001568e" key="End"/>
+		<item value="/home/py/workspace/RTOS_workspace/STM32_HelloWorld/Segger_mem_dumps/001freertos_hw.SVdat" key="File"/>
+		<item value="rawbinary" key="SELECTED_EXPORTER"/>
+		<item value="0x10" key="Initial address"/>
+	</section>
+</section>

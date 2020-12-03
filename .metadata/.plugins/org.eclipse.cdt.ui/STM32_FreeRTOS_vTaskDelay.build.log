@@ -1,0 +1,23 @@
+01:55:54 **** Build of configuration Debug for project STM32_FreeRTOS_vTaskDelay ****
+make -j8 all 
+Building file: ../src/main.c
+Invoking: MCU GCC Compiler
+/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_vTaskDelay/Debug
+arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -DSTM32 -DSTM32F4 -DSTM32F446RETx -DNUCLEO_F446RE -DDEBUG -DSTM32F446xx -DUSE_STDPERIPH_DRIVER -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_vTaskDelay/StdPeriph_Driver/inc" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_vTaskDelay/Config" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_vTaskDelay/Third-Party/FreeRTOS/org/Source/include" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_vTaskDelay/Third-Party/FreeRTOS/org/Source/portable/GCC/ARM_CM4F" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_vTaskDelay/Third-Party/SEGGER/Config" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_vTaskDelay/Third-Party/SEGGER/OS" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_vTaskDelay/Third-Party/SEGGER/SEGGER" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_vTaskDelay/inc" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_vTaskDelay/CMSIS/device" -I"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_vTaskDelay/CMSIS/core" -O0 -g3 -Wall -fmessage-length=0 -ffunction-sections -c -MMD -MP -MF"src/main.d" -MT"src/main.o" -o "src/main.o" "../src/main.c"
+Finished building: ../src/main.c
+ 
+Building target: STM32_FreeRTOS_vTaskDelay.elf
+Invoking: MCU GCC Linker
+arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -T"/home/py/workspace/RTOS_workspace/STM32_FreeRTOS_vTaskDelay/LinkerScript.ld" -Wl,-Map=output.map -Wl,--gc-sections -o "STM32_FreeRTOS_vTaskDelay.elf" @"objects.list"   -lm
+Finished building target: STM32_FreeRTOS_vTaskDelay.elf
+ 
+make --no-print-directory post-build
+Generating binary and Printing size information:
+arm-none-eabi-objcopy -O binary "STM32_FreeRTOS_vTaskDelay.elf" "STM32_FreeRTOS_vTaskDelay.bin"
+arm-none-eabi-size "STM32_FreeRTOS_vTaskDelay.elf"
+   text	   data	    bss	    dec	    hex	filename
+  36528	   2532	  96552	 135612	  211bc	STM32_FreeRTOS_vTaskDelay.elf
+ 
+
+01:55:55 Build Finished (took 779ms)
+

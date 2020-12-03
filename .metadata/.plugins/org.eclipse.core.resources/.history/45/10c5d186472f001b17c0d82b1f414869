@@ -1,0 +1,294 @@
+/**
+  ******************************************************************************
+  * @file    main.c
+  * @author  Antonio Valderas
+  * @version V1.0
+  * @date    24-Noviembre-2020
+  * @brief   Default main function.
+  ******************************************************************************
+*/
+
+// Se incluyen librerías generales.
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+#include <stdlib.h>
+
+// Se incluyen librerías de FreeRTOS.
+#include "FreeRTOS.h"
+#include "task.h"
+#include "queue.h"
+#include "semphr.h"
+
+// Se incluye librería específica del microcontrolador.
+#include "stm32f4xx.h"
+
+// Macros
+#define TRUE 1
+#define FALSE 0
+#define NOT_PRESSED FALSE
+#define PRESSED TRUE
+
+// Variables globales.
+char usr_msg[250] = {0};
+
+// Prototipos de funciones.
+static void prvSetupHardware(void);
+void printmsg(char *msg);
+static void prvSetupUart(void);
+void prvSetupGpio(void);
+			
+// Prototipos de las dos tareas.
+static void vHandlerTask(void *pvParameters);
+static void vPeriodicTask(void *pvParameters);
+
+/* Activa la interrupción de software y establece
+ * su prioridad. */
+static void prvSetupSoftwareInterrupt();
+
+/* El ISR para la interrupción. Esta es la interrupción
+ * con la que la tarea estará sincronizada. */
+void vSoftwareInterruptHandler( void );
+
+// Handles de tareas.
+TaskHandle_t xTaskHandle1 = NULL;
+TaskHandle_t xTaskHandle2 = NULL;
+
+/* Handle del semáforo. Para referenciar el semáforo que se
+ * usa. */
+xSemaphoreHandle xCountingSemaphore = NULL;
+
+int main(void)
+{
+	// Esto es para activar el 'timestamp' en SEGGER.
+	DWT->CTRL |= (1 << 0); /*Activa el contador de ciclos
+	(CYCCNT) en el registro de control (CTRL).*/
+
+	/* 1. Resetea la configuración del reloj del sistema
+	 * al estado de reseteo por defecto:
+	 * HSI ON, PLL OFF, HSE OFF, reloj del sistema = 16MHz,
+	 * reloj de la CPU = 16MHz */
+	RCC_DeInit();
+
+	//2. Actualiza la variable 'SystemCoreClock'.
+	SystemCoreClockUpdate();
+
+	prvSetupHardware();
+
+	// Empieza la grabación con SEGGER
+	SEGGER_SYSVIEW_Conf();
+	SEGGER_SYSVIEW_Start();
+
+	sprintf(usr_msg,"\r\nEsta es la Demo de los 'Semáforos Contadores'.\r\n");
+	printmsg(usr_msg);
+
+	/* Se crea un semáforo contador, guardándolo en el
+	 * 'handle' de semáforo creado anteriormente. La cuenta
+	 * comienza en '0', alcanzando un valor máximo de '10'. */
+	xCountingSemaphore = xSemaphoreCreateCounting(10,0);
+
+	/* Sólo si el semáforo ha sido creado con éxito, la
+	 * interrupción, las tareas y el planificador
+	 * son creados */
+	if (xCountingSemaphore != NULL)
+	{
+		/* Activa la interrupcíon del botón y establece su
+		 * prioridad. */
+		prvSetupSoftwareInterrupt();
+
+		/* Se crea la Tarea 'Handler'. Esta tarea será
+		 * sincronizada con la interrupción. Tiene una
+		 * prioridad menor que la otra tarea y se
+		 * ejecutará inmediatamente después de salir de
+		 * la interrupción. */
+		xTaskCreate(vHandlerTask, "Handler", 500, NULL, 1, &xTaskHandle2);
+
+		/* Se crea la Tarea 'Periodic', que genera de forma
+		 * periódica una interrupción de software. */
+		xTaskCreate(vPeriodicTask, "Periodic", 500, NULL, 3, &xTaskHandle1);
+
+		/* Se crea el planificador, por lo que ambas tareas
+		 * se empezarán a ejecutar. */
+		vTaskStartScheduler();
+	}
+	else
+	{
+		// Sino se imprime mensaje de error por el UART2.
+		sprintf(usr_msg,"La creación del semáforo falló. \r\n");
+		printmsg(usr_msg);
+	}
+
+	/* Si tod*o* va bien nunca llegaremos aquí, ya que el
+	 * planificador estará ejecutando las tareas.
+	 * Si llegamos aquí es probable que no haya suficiente
+	 * memoria dinámica disponible para crear los recursos. */
+	for(;;);
+}
+
+// Tarea-1.
+static void vHandlerTask(void *pvParameters)
+{
+	// Variables locales
+	unsigned char xWorkTicketId;
+	portBASE_TYPE xStatus;
+
+	/* El semáforo es creado en un estado vacío. Por ello,
+	 * debe primero ser dado usando esta API antes de que
+	 * pueda posteriormente ser obtenido. */
+	xSemaphoreGive(xWork);
+
+	for( ;; )
+	{
+		/* Crea un 'Ticket ID' usando una función
+		 * generadora de números aleatorios. */
+		xWorkTicketId = (rand() & 0x1FF);
+		// Se envía el ID a la cola creada al principio.
+		xStatus = xQueueSend(xWorkQueue,&xWorkTicketId,portMAX_DELAY);
+
+		// Si el envío del ID a la cola es correcto...
+		if (xStatus != pdFALSE)
+		{
+			/* La tarea 1 notifica a la tarea 2 dando el
+			 * semáforo. */
+			xSemaphoreGive(xWork);
+			/* Después de realizar esto, la tarea no tiene
+			 * nada más que hacer, por lo que cede el
+			 * control del procesador a la tarea-2. */
+			taskYIELD();
+		}
+		else
+		{
+			// Si no es correcto, imprime mensaje de error.
+			sprintf(usr_msg,"No se pudo enviar a la cola.\r\n");
+			printmsg(usr_msg);
+		}
+	}
+}
+
+// Función de apoyo para la tarea-2.
+void EmployeeDoWork(unsigned char TicketId)
+{
+	// Implementa el trabajo de acuerdo con el Ticket ID.
+	sprintf(usr_msg,"Tarea 2. Trabajando en Ticket ID: %d\r\n",TicketId);
+	printmsg(usr_msg);
+	/* La tarea se bloquea durante una cantidad de tiempo
+	 * aleatoria, ya que depende de la variable 'TicketId'. */
+	vTaskDelay(TicketId);
+}
+
+// Tarea periódica que tiene mayor prioridad.
+static void vPeriodicTask(void *pvParameters)
+{
+	// Bucle infinito
+	for( ;; )
+	{
+		/* Esta tarea se usa simplemente para simular una
+		 * interrupción. Para conseguirlo, se genera
+		 * periódicaente (500ms) una interrupción de
+		 * software. */
+		vTaskDelay(pdMS_TO_TICKS(500));
+
+		/* Genera la interrupción, imprimiendo un mensaje
+		 * tanto antes como después, de forma que la
+		 * secuencia de ejecución sea evidente en la salida. */
+	    sprintf(usr_msg, "Tarea periódica: Activando la interrupción.\r\n" );
+    	printmsg(usr_msg);
+
+    	//Activa el bit encargado de la interrupción externa.
+    	NVIC_SetPendingIRQ(EXTI15_10_IRQn);
+
+		        sprintf(usr_msg, "Periodic task - Resuming.\r\n" );
+		        printmsg(usr_msg);
+}
+
+static void prvSetupHardware(void)
+{
+	// Configuración del botón de usuario y el LED.
+	prvSetupGpio();
+
+	// Configuración del UART2.
+	prvSetupUart();
+}
+
+/* Para imprimir mensajes por el UART sin que se solapen
+ * los caracteres. */
+void printmsg(char *msg)
+{
+	for(uint32_t i = 0; i < strlen(msg); i++)
+	{
+		while (USART_GetFlagStatus(USART2, USART_FLAG_TXE) != SET);
+		USART_SendData(USART2, msg[i]);
+	}
+
+}
+
+static void prvSetupUart(void)
+{
+	// Variables para definir la estructura de GPIO y USART.
+	GPIO_InitTypeDef gpio_uart_pins;
+	USART_InitTypeDef uart2_init;
+
+	/* 1. Se activa el reloj de los periféricos UART2 y
+	 * GPIOA. PA2 es UART2_TX, PA3 es UART2_RX. */
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2,ENABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA,ENABLE);
+
+	/* Inicializar a cero todos y cada uno de los miembros
+	 * de la estructura. */
+	memset(&gpio_uart_pins,0,sizeof(gpio_uart_pins));
+
+	/* 2. Configuración de función alterna de los pins del
+	 * microcontrolador para que se comporten como UART2 TX
+	 * y RX. */
+	gpio_uart_pins.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3;
+	gpio_uart_pins.GPIO_Mode = GPIO_Mode_AF;
+	gpio_uart_pins.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_Init(GPIOA, &gpio_uart_pins);
+
+	/* 3. Ajustes del modo 'función alternativa' para los
+	 * pines. */
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_USART2); //PA2
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource3, GPIO_AF_USART2); //PA3
+
+	/* Inicializar a cero todos y cada uno de los miembros
+	 * de la estructura. */
+	memset(&uart2_init,0,sizeof(uart2_init));
+
+	// 4. Parámetros de inicialización del UART
+	uart2_init.USART_BaudRate = 115200;
+	uart2_init.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	uart2_init.USART_Mode = USART_Mode_Tx | USART_Mode_Rx;
+	uart2_init.USART_Parity = USART_Parity_No;
+	uart2_init.USART_StopBits = USART_StopBits_1;
+	uart2_init.USART_WordLength = USART_WordLength_8b;
+	USART_Init(USART2, &uart2_init);
+
+	// 5. Se activa el periférico UART2.
+	USART_Cmd(USART2, ENABLE);
+}
+
+void prvSetupGpio(void)
+{
+	// Activa las señales de reloj de los periféricos
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+
+	/* Inicializa GPIO A5 (LED) según los parámetros de
+	 * debajo. */
+	GPIO_InitTypeDef led_init, button_init;
+	led_init.GPIO_Mode = GPIO_Mode_OUT;
+	led_init.GPIO_OType = GPIO_OType_PP;
+	led_init.GPIO_Pin = GPIO_Pin_5;
+	led_init.GPIO_Speed = GPIO_Low_Speed;
+	led_init.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOA, &led_init);
+
+	/* Inicializa GPIO C13 (USER BUTTON) según los
+	 * parámetros de debajo. */
+	button_init.GPIO_Mode = GPIO_Mode_IN;
+	button_init.GPIO_OType = GPIO_OType_PP;
+	button_init.GPIO_Pin = GPIO_Pin_13;
+	button_init.GPIO_Speed = GPIO_Low_Speed;
+	button_init.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOC, &button_init);
+}
